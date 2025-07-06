@@ -39,6 +39,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/FloatStamped.msg"
     "msg/LabelStamped.msg"
     "msg/ProcessStats.msg"
+    "msg/TaskStats.msg"
     "msg/TraceNotification.msg"
     "msg/TraceNotifications.msg"
     DEPENDENCIES builtin_interfaces )

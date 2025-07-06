@@ -132,51 +132,6 @@ double cpuFreq(size_t p_num)
 #endif
 }
 
-void getProcessStats(double& resident_set_mb, size_t& num_threads)
-{
-    resident_set_mb = 0.;
-    num_threads = 0;
-    std::string _buff;
-    long rss = 0;
-
-    try
-    {
-        std::ifstream f{"/proc/self/stat", std::ios_base::in};
-        f >> _buff                   //pid
-            >> _buff                 //comm
-            >> _buff                 //state
-            >> _buff                 //ppid
-            >> _buff                 //pgrp
-            >> _buff                 //session
-            >> _buff                 //tty_nr
-            >> _buff                 //tpgid
-            >> _buff                 //flags
-            >> _buff                 //minflt
-            >> _buff                 //cminflt
-            >> _buff                 //majflt
-            >> _buff                 //cmajflt
-            >> _buff                 //utime
-            >> _buff                 //stime
-            >> _buff                 //cutime
-            >> _buff                 //cstime
-            >> _buff                 //priority
-            >> _buff                 //nice
-            >> num_threads >> _buff  //itrealvalue
-            >> _buff                 //starttime
-            >> _buff                 //vsize
-            >> rss;                  // don't care about the rest
-        f.close();
-    }
-    catch (...)
-    {
-    }
-
-    long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024;
-    resident_set_mb = rss * page_size_kb / 1000.;
-}
-
-
-
 #ifdef HAS_SENSORS
 class ReadCPUTempContext
 {
@@ -254,9 +209,56 @@ double readCpuTemp()
 
 
 
+void ProcessStats::getMemAndThreads(
+    double& resident_set_mb,
+    size_t& num_threads)
+{
+    resident_set_mb = 0.;
+    num_threads = 0;
+    std::string _buff;
+    long rss = 0;
+
+    try
+    {
+        std::ifstream f{"/proc/self/stat", std::ios_base::in};
+        f >> _buff                   //pid
+            >> _buff                 //comm
+            >> _buff                 //state
+            >> _buff                 //ppid
+            >> _buff                 //pgrp
+            >> _buff                 //session
+            >> _buff                 //tty_nr
+            >> _buff                 //tpgid
+            >> _buff                 //flags
+            >> _buff                 //minflt
+            >> _buff                 //cminflt
+            >> _buff                 //majflt
+            >> _buff                 //cmajflt
+            >> _buff                 //utime
+            >> _buff                 //stime
+            >> _buff                 //cutime
+            >> _buff                 //cstime
+            >> _buff                 //priority
+            >> _buff                 //nice
+            >> num_threads >> _buff  //itrealvalue
+            >> _buff                 //starttime
+            >> _buff                 //vsize
+            >> rss;                  // don't care about the rest
+        f.close();
+    }
+    catch (...)
+    {
+    }
+
+    long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024;
+    resident_set_mb = rss * page_size_kb / 1000.;
+}
 
 
-ProcessMetrics::ProcessMetrics() : num_processors{csm::metrics::numProcessors()}
+
+
+
+ProcessStats::ProcessStats() : num_processors{csm::metrics::numProcessors()}
 {
     struct tms time_sample{};
 
@@ -265,7 +267,7 @@ ProcessMetrics::ProcessMetrics() : num_processors{csm::metrics::numProcessors()}
     this->last_user_cpu = time_sample.tms_utime;
 }
 
-void ProcessMetrics::update()
+void ProcessStats::update()
 {
     struct tms _sample{};
     clock_t now = times(&_sample);

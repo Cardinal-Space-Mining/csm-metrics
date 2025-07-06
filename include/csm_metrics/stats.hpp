@@ -56,91 +56,99 @@ namespace csm
 namespace metrics
 {
 
-template<size_t Rolling_Sample_Max = 0>
-struct ThreadMetrics_
-{
-    double addSample(
-        const std::chrono::system_clock::time_point& start,
-        const std::chrono::system_clock::time_point& end);
-
-    double last_comp_time{0.};
-    double avg_comp_time{0.};
-    double max_comp_time{0.};
-    double avg_call_delta{0.};
-    size_t samples{0};
-
-protected:
-    std::chrono::system_clock::time_point last_call_time;
-    // std::mutex mtx;
-};
-using ThreadMetrics = ThreadMetrics_<>;
-
-
-
 std::string cpuBrandString();
 size_t numProcessors();
 double cpuFreq(size_t p_num = 0);
-void getProcessStats(double& resident_set_mb, size_t& num_threads);
 
 #ifdef HAS_SENSORS
 double readCpuTemp();
 #endif
 
-struct ProcessMetrics
+class ProcessStats
 {
-    ProcessMetrics();
+public:
+    static void getMemAndThreads(double& resident_set_mb, size_t& num_threads);
+
+public:
+    ProcessStats();
+
+public:
     void update();
 
-    double last_cpu_percent{0.};
-    double avg_cpu_percent{0.};
-    double max_cpu_percent{0.};
+    inline double currCpuPercent() const { return this->last_cpu_percent; }
+    inline double avgCpuPercent() const { return this->avg_cpu_percent; }
+    inline double maxCpuPercent() const { return this->max_cpu_percent; }
 
 protected:
     clock_t last_cpu, last_sys_cpu, last_user_cpu;
     size_t cpu_samples{0}, num_processors{0};
+
+    double last_cpu_percent{0.};
+    double avg_cpu_percent{0.};
+    double max_cpu_percent{0.};
 };
 
-};  // namespace metrics
-};  // namespace csm
-
-
-
-template<size_t Rolling_Sample_Max>
-double csm::metrics::ThreadMetrics_<Rolling_Sample_Max>::addSample(
-    const std::chrono::system_clock::time_point& start,
-    const std::chrono::system_clock::time_point& end)
+template<typename Clock_T = std::chrono::system_clock>
+class TaskStats_
 {
-    // std::lock_guard<std::mutex> _lock{ this->mtx };
+public:
+    using ClockT = Clock_T;
+    using TimePoint = typename ClockT::time_point;
 
-    const double call_diff =
-        std::chrono::duration_cast<std::chrono::duration<double>>(
-            start - this->last_call_time)
-            .count();
-    const double comp_time =
-        std::chrono::duration_cast<std::chrono::duration<double>>(end - start)
-            .count();
+public:
+    double addSample(const TimePoint& start, const TimePoint& end);
 
-    this->last_call_time = start;
-    this->last_comp_time = comp_time;
+    inline double prevTime() const { return this->prev_time; }
+    inline double avgTime() const { return this->avg_time; }
+    inline double maxTime() const { return this->max_time; }
+    inline double avgPeriod() const { return this->avg_period; }
+    inline size_t numSamples() const { return this->samples; }
 
-    const size_t sample_weight =
-        (Rolling_Sample_Max > 0) ? std::min(Rolling_Sample_Max, this->samples)
-                                 : this->samples;
+protected:
+    TimePoint prev_sample_tp;
 
-    this->avg_comp_time =
-        (this->avg_comp_time * sample_weight + comp_time) / (sample_weight + 1);
+    double prev_time{0.};
+    double avg_time{0.};
+    double max_time{0.};
+    double avg_period{0.};
+    size_t samples{0};
+};
+using TaskStats = TaskStats_<>;
+
+
+
+
+
+template<typename Clock_T>
+double TaskStats_<Clock_T>::addSample(
+    const TimePoint& start,
+    const TimePoint& end)
+{
+    const double period =
+        std::chrono::duration<double>(start - this->prev_sample_tp).count();
+    const double dt = std::chrono::duration<double>(end - start).count();
+
+    this->prev_sample_tp = start;
+    this->prev_time = dt;
+
+    const double w =
+        (static_cast<double>(this->samples) /
+         static_cast<double>(this->samples + 1));
+
+    this->avg_time = (this->avg_time * w) + (dt * (1. - w));
     if (this->samples != 0)
     {
-        this->avg_call_delta =
-            (this->avg_call_delta * sample_weight + call_diff) /
-            (sample_weight + 1);
+        this->avg_period = (this->avg_period * w) + (period * (1. - w));
     }
     this->samples++;
 
-    if (comp_time > this->max_comp_time)
+    if (dt > this->max_time)
     {
-        this->max_comp_time = comp_time;
+        this->max_time = dt;
     }
 
-    return comp_time;
+    return dt;
 }
+
+};  // namespace metrics
+};  // namespace csm
