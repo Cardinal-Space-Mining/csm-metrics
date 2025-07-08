@@ -205,6 +205,11 @@ double readCpuTemp()
     static ReadCPUTempContext ctx;
     return ctx.get_cpu_tmp();
 }
+#else
+double readCpuTemp()
+{
+    return 0.;
+}
 #endif
 
 
@@ -293,6 +298,21 @@ void ProcessStats::update()
     {
         this->max_cpu_percent = this->last_cpu_percent;
     }
+}
+
+ProcessStatsMsg& ProcessStats::toMsg(ProcessStatsMsg& msg) const
+{
+    double mem;
+    size_t n_threads;
+
+    getMemAndThreads(mem, n_threads);
+
+    msg.cpu_percent = static_cast<float>(this->last_cpu_percent);
+    msg.cpu_temp = static_cast<float>(readCpuTemp());
+    msg.mem_usage_mb = static_cast<float>(mem);
+    msg.num_threads = static_cast<uint32_t>(n_threads);
+
+    return msg;
 }
 
 };  // namespace metrics

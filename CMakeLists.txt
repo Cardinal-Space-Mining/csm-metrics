@@ -50,10 +50,13 @@ rosidl_get_typesupport_target(${PROJECT_NAME}_custom_types
 # --- Stats --------------------------------------------------------------------
 add_library(stats STATIC
     "src/cpp/stats.cpp" )
+target_link_libraries(stats
+    ${${PROJECT_NAME}_custom_types} )
 target_include_directories(stats PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include>" )
-ament_target_dependencies(stats)
+ament_target_dependencies(stats
+    rclcpp )
 
 file(WRITE ${CMAKE_BINARY_DIR}/test_sensors.cpp "#include <sensors/sensors.h>")
 try_compile(HAS_SENSORS ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/test_sensors.cpp)

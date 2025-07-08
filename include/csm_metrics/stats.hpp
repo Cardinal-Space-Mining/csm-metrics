@@ -50,19 +50,24 @@
 
 #include <sys/times.h>
 
+#include <csm_metrics/msg/task_stats.hpp>
+#include <csm_metrics/msg/process_stats.hpp>
+
 
 namespace csm
 {
 namespace metrics
 {
 
+using TaskStatsMsg = csm_metrics::msg::TaskStats;
+using ProcessStatsMsg = csm_metrics::msg::ProcessStats;
+
+
 std::string cpuBrandString();
 size_t numProcessors();
 double cpuFreq(size_t p_num = 0);
 
-#ifdef HAS_SENSORS
 double readCpuTemp();
-#endif
 
 class ProcessStats
 {
@@ -78,6 +83,20 @@ public:
     inline double currCpuPercent() const { return this->last_cpu_percent; }
     inline double avgCpuPercent() const { return this->avg_cpu_percent; }
     inline double maxCpuPercent() const { return this->max_cpu_percent; }
+
+public:
+    ProcessStatsMsg& toMsg(ProcessStatsMsg& msg) const;
+
+    inline ProcessStatsMsg toMsg() const
+    {
+        ProcessStatsMsg msg;
+        this->toMsg(msg);
+        return msg;
+    }
+    inline operator ProcessStatsMsg() const
+    {
+        return this->toMsg();
+    }
 
 protected:
     clock_t last_cpu, last_sys_cpu, last_user_cpu;
@@ -103,6 +122,27 @@ public:
     inline double maxTime() const { return this->max_time; }
     inline double avgPeriod() const { return this->avg_period; }
     inline size_t numSamples() const { return this->samples; }
+
+public:
+    inline TaskStatsMsg& toMsg(TaskStatsMsg& msg)
+    {
+        msg.delta_t = static_cast<float>(this->prev_time);
+        msg.avg_delta_t = static_cast<float>(this->avg_time);
+        msg.avg_freq = static_cast<float>(1. / this->avg_period);
+        msg.iterations = static_cast<uint32_t>(this->samples);
+
+        return msg;
+    }
+    inline TaskStatsMsg toMsg()
+    {
+        TaskStatsMsg msg;
+        this->toMsg(msg);
+        return msg;
+    }
+    inline operator TaskStatsMsg ()
+    {
+        return this->toMsg();
+    }
 
 protected:
     TimePoint prev_sample_tp;
