@@ -127,39 +127,66 @@ class ProfilingManager(Node):
         to_end = {}
         for notification in msg.notifications:
             thread_idx =  self.get_thread_idx(notification.thread_id)
-            label_idx = self.get_label_idx(notification.label)
             label_stack = self.thread_label_stacks[thread_idx]
             label_set = self.thread_label_sets[thread_idx]
-            if len(label_stack) == 0 or label_stack[-1] != label_idx:
-                if(label_idx in label_set):
-                    self.get_logger().error(
-                        f'Label {notification.label} recieved for thread {thread_idx} out of order! This notification will be discarded.' )
-                    return
-                else:
-                    label_stack.append(label_idx)
-                    label_set.add(label_idx)
-                    pub_depth = len(label_stack) - 1
-
-                    if thread_idx in to_end and pub_depth in to_end[thread_idx]:
-                        del to_end[thread_idx][pub_depth]
-
-                    self.label_prev_stamps[label_idx] = notification.ns_since_epoch
-                    self.publish_status(
-                        thread_idx,
-                        pub_depth,
-                        ProfilingManager.construct_status(
-                            notification.ns_since_epoch,
-                            notification.label ) )
+            if not notification.label:
+                # empty label is treated as a synchronization token --> clear the thread's stack, set and any queued nullifications
+                label_stack.clear()
+                label_set.clear()
+                if thread_idx in to_end:
+                    to_end[thread_idx].clear()
             else:
-                label_set.remove(label_stack.pop())
-                pub_depth = len(label_stack)
-                if thread_idx not in to_end:
-                    to_end[thread_idx] = {}
-                to_end[thread_idx][pub_depth] = notification.ns_since_epoch
-                self.publish_dt(
-                    label_idx,
-                    float(notification.ns_since_epoch - self.label_prev_stamps[label_idx]) / 1e9 )
+                label_idx = self.get_label_idx(notification.label)
+                if len(label_stack) == 0 or label_stack[-1] != label_idx:
+                    # stack is empty OR the label is different than the top -- this *should* be a new label
+                    if(label_idx in label_set):
+                        # the label was not, in fact, new
+                        self.get_logger().error(
+                            f'Received duplicate label {notification.label} on thread {thread_idx}! The notification will be discarded.' )
+                        return
+                    else:
+                        # the label is new, so add it to the stack
+                        label_stack.append(label_idx)
+                        label_set.add(label_idx)
+                        pub_depth = len(label_stack) - 1
 
+                        # if this thread/depth previously ended, overrule by the current task
+                        if thread_idx in to_end and pub_depth in to_end[thread_idx]:
+                            null_t = to_end[thread_idx][pub_depth]
+                            # publish "filler" if the current task doesn't immediately start after the previous
+                            if null_t != notification.ns_since_epoch:
+                                self.publish_status(
+                                    thread_idx,
+                                    pub_depth,
+                                    ProfilingManager.construct_status(
+                                        null_t,
+                                        "" ) )
+                            del to_end[thread_idx][pub_depth]
+
+                        # store start time for this label
+                        self.label_prev_stamps[label_idx] = notification.ns_since_epoch
+                        # update the current thread's task at the current stack depth
+                        self.publish_status(
+                            thread_idx,
+                            pub_depth,
+                            ProfilingManager.construct_status(
+                                notification.ns_since_epoch,
+                                notification.label ) )
+                else:
+                    # the stack is not empty AND the label matches the top of the stack
+                    # pop from stack and remove from set
+                    label_set.remove(label_stack.pop())
+                    pub_depth = len(label_stack)
+                    # save this thread/depth to be nullified if no tasks in the current buffer overwrite it
+                    if not thread_idx in to_end:
+                        to_end[thread_idx] = {}
+                    to_end[thread_idx][pub_depth] = notification.ns_since_epoch
+                    # use the stored previous stamp to iterate the metrics for this task (and publish)
+                    self.publish_dt(
+                        label_idx,
+                        float(notification.ns_since_epoch - self.label_prev_stamps[label_idx]) / 1e9 )
+
+        # nullify any thread/depths that had a task finish but haven't been overwritten
         for thread_idx in to_end:
             depths_to_ts = to_end[thread_idx]
             for depth in depths_to_ts:

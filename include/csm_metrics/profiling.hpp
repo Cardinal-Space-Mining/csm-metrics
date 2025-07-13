@@ -63,8 +63,8 @@ void init(
     const char* topic = PROFILING_DEFAULT_TOPIC,
     const rclcpp::QoS& qos = PROFILING_DEFAULT_QOS);
 void deinit();
-void flush();
-void flush_local();
+void flush();           // flushes the current thread if local buffering, otherwise flushes all
+void flush_local();     // if compiled with thread_local buffering, only flushes the current thread buffer
 void notify_unbuffered(const char* label);
 void notify2_unbuffered(const char* label1, const char* label2);
 void notify(
@@ -102,6 +102,7 @@ void notify2(
     #define PROFILING_DEINIT()      csm::metrics::profiling::deinit()
     #define PROFILING_FLUSH()       csm::metrics::profiling::flush()
     #define PROFILING_FLUSH_LOCAL() csm::metrics::profiling::flush_local()
+    #define PROFILING_SYNC()        csm::metrics::profiling::notify("");
     #define PROFILING_NOTIFY_ALWAYS(label, ...)                            \
         csm::metrics::profiling::notify(#label __VA_OPT__(, ) __VA_ARGS__)
     #define PROFILING_NOTIFY2_ALWAYS(label1, label2, ...) \
