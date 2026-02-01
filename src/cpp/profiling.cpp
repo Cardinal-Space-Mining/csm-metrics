@@ -107,6 +107,10 @@ void deinit() { notif_pub.reset(); }
 
 void flush()
 {
+    if (!notif_pub)
+    {
+        return;
+    }
 #if USING_SHARED_BUFFER
     std::unique_lock<std::mutex> lock{buff_mtx};
 #endif
@@ -124,12 +128,22 @@ void flush_local()
 
 void notify_unbuffered(const char* label)
 {
+    if (!notif_pub)
+    {
+        return;
+    }
+
     TraceNotificationsMsg msg;
     fillMsg(msg.notifications.emplace_back(), label);
     notif_pub->publish(msg);
 }
 void notify2_unbuffered(const char* label1, const char* label2)
 {
+    if (!notif_pub)
+    {
+        return;
+    }
+
     TraceNotificationsMsg msg;
     msg.notifications.resize(2);
     const uint64_t ns = getNs();
@@ -142,6 +156,11 @@ void notify2_unbuffered(const char* label1, const char* label2)
 
 void notify(const char* label, size_t buffering)
 {
+    if (!notif_pub)
+    {
+        return;
+    }
+
 #if USING_SHARED_BUFFER
     std::unique_lock<std::mutex> lock{buff_mtx};
 #endif
@@ -158,6 +177,11 @@ void notify(const char* label, size_t buffering)
 }
 void notify2(const char* label1, const char* label2, size_t buffering)
 {
+    if (!notif_pub)
+    {
+        return;
+    }
+
 #if USING_SHARED_BUFFER
     std::unique_lock<std::mutex> lock{buff_mtx};
 #endif
