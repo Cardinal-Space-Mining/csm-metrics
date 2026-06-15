@@ -56,19 +56,19 @@ class ProfilingManager(Node):
 
         self.declare_parameter('notification_topic', 'trace_notifications')
         sub_topic = self.get_parameter(
-            'notification_topic' ).get_parameter_value().string_value
-        
+            'notification_topic').get_parameter_value().string_value
+
         self.PUB_QOS = QoSProfile(
-            history = QoSHistoryPolicy.KEEP_LAST,
-            depth = 10,
-            reliability = QoSReliabilityPolicy.RELIABLE,
-            durability = QoSDurabilityPolicy.VOLATILE )
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.VOLATILE)
 
         self.notification_sub = self.create_subscription(
             TraceNotifications,
             sub_topic,
             self.notification_callback,
-            self.PUB_QOS )
+            self.PUB_QOS)
 
         self.thread_indices = {}
         self.thread_status_pubs = []
@@ -79,7 +79,7 @@ class ProfilingManager(Node):
         self.label_dt_pubs = []
         self.label_prev_stamps = []
 
-    def get_thread_idx(self, thread_id : int):
+    def get_thread_idx(self, thread_id: int):
         if thread_id not in self.thread_indices:
             self.thread_indices[thread_id] = len(self.thread_indices)
             self.thread_status_pubs.append(list())
@@ -87,25 +87,25 @@ class ProfilingManager(Node):
             self.thread_label_sets.append(set())
         return self.thread_indices[thread_id]
 
-    def get_label_idx(self, label : str):
+    def get_label_idx(self, label: str):
         if label not in self.label_indices:
             self.label_indices[label] = len(self.label_indices)
             self.label_dt_pubs.append(
                 self.create_publisher(
                     Float64,
                     f'profiling/tasks/{label}/dt',
-                    qos_profile_sensor_data ) )
+                    qos_profile_sensor_data))
             self.label_prev_stamps.append(0)
         return self.label_indices[label]
 
-    def construct_status(nanos : int, label : str):
+    def construct_status(nanos: int, label: str):
         status = LabelStamped()
         t = RclTime(nanoseconds=nanos)
         status.stamp = t.to_msg()
         status.label = label
         return status
 
-    def publish_status(self, thread_idx : int, depth : int, msg : LabelStamped):
+    def publish_status(self, thread_idx: int, depth: int, msg: LabelStamped):
         pubs = self.thread_status_pubs[thread_idx]
 
         while len(pubs) <= depth:
@@ -113,20 +113,20 @@ class ProfilingManager(Node):
                 self.create_publisher(
                     LabelStamped,
                     f'profiling/thread{thread_idx}_d{len(pubs)}',
-                    self.PUB_QOS ) )
+                    self.PUB_QOS))
 
         pubs[depth].publish(msg)
         # self.get_logger().info(f'Published status change for thread {thread_idx} at depth {depth} : {msg.task}')
 
-    def publish_dt(self, label_idx : int, value : float):
+    def publish_dt(self, label_idx: int, value: float):
         msg = Float64()
         msg.data = value
         self.label_dt_pubs[label_idx].publish(msg)
 
-    def notification_callback(self, msg : TraceNotifications):
+    def notification_callback(self, msg: TraceNotifications):
         to_end = {}
         for notification in msg.notifications:
-            thread_idx =  self.get_thread_idx(notification.thread_id)
+            thread_idx = self.get_thread_idx(notification.thread_id)
             label_stack = self.thread_label_stacks[thread_idx]
             label_set = self.thread_label_sets[thread_idx]
             if not notification.label:
@@ -139,10 +139,10 @@ class ProfilingManager(Node):
                 label_idx = self.get_label_idx(notification.label)
                 if len(label_stack) == 0 or label_stack[-1] != label_idx:
                     # stack is empty OR the label is different than the top -- this *should* be a new label
-                    if(label_idx in label_set):
+                    if (label_idx in label_set):
                         # the label was not, in fact, new
                         self.get_logger().error(
-                            f'Received duplicate label {notification.label} on thread {thread_idx}! The notification will be discarded.' )
+                            f'Received duplicate label {notification.label} on thread {thread_idx}! The notification will be discarded.')
                         return
                     else:
                         # the label is new, so add it to the stack
@@ -160,7 +160,7 @@ class ProfilingManager(Node):
                                     pub_depth,
                                     ProfilingManager.construct_status(
                                         null_t,
-                                        "" ) )
+                                        ""))
                             del to_end[thread_idx][pub_depth]
 
                         # store start time for this label
@@ -171,7 +171,7 @@ class ProfilingManager(Node):
                             pub_depth,
                             ProfilingManager.construct_status(
                                 notification.ns_since_epoch,
-                                notification.label ) )
+                                notification.label))
                 else:
                     # the stack is not empty AND the label matches the top of the stack
                     # pop from stack and remove from set
@@ -184,7 +184,7 @@ class ProfilingManager(Node):
                     # use the stored previous stamp to iterate the metrics for this task (and publish)
                     self.publish_dt(
                         label_idx,
-                        float(notification.ns_since_epoch - self.label_prev_stamps[label_idx]) / 1e9 )
+                        float(notification.ns_since_epoch - self.label_prev_stamps[label_idx]) / 1e9)
 
         # nullify any thread/depths that had a task finish but haven't been overwritten
         for thread_idx in to_end:
@@ -195,17 +195,18 @@ class ProfilingManager(Node):
                     depth,
                     ProfilingManager.construct_status(
                         depths_to_ts[depth],
-                        "" ) )
+                        ""))
 
 
-def main(args = None):
-    rclpy.init(args = args)
+def main(args=None):
+    rclpy.init(args=args)
 
     node = ProfilingManager()
     rclpy.spin(node)
     node.destroy_node()
 
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
