@@ -1,0 +1,5 @@
+repositories:
+  csm-utils:
+    type: git
+    url: https://github.com/Cardinal-Space-Mining/csm-utils
+    version: main
