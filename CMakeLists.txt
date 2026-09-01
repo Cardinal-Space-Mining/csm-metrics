@@ -9,31 +9,13 @@ find_package(rosidl_typesupport_interface REQUIRED)
 find_package(rosidl_generator_py REQUIRED)
 
 find_package(ament_cmake)
+find_package(csm_utils REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
-# --- Presets ------------------------------------------------------------------
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
-# Default to C++20
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 20)
-endif()
-
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-if(NOT MSVC)
-  if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-  endif()
-endif()
+standard_compile_options()
 
 # --- Messages -----------------------------------------------------------------
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -56,7 +38,7 @@ target_link_libraries(stats
 target_include_directories(stats PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include>" )
-ament_target_dependencies(stats
+auto_target_dependencies(stats
     rclcpp )
 
 file(WRITE ${CMAKE_BINARY_DIR}/test_sensors.cpp "#include <sensors/sensors.h>")
@@ -90,7 +72,7 @@ target_link_libraries(profiling
 target_include_directories(profiling PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include>" )
-ament_target_dependencies(profiling
+auto_target_dependencies(profiling
     rclcpp )
 
 
